@@ -1,0 +1,193 @@
+# Frappe Education (Frappe v16 + ERPNext + HRMS + Education) on the shared VPS.
+# Based on frappe_docker's compose.yaml + overrides/compose.mariadb.yaml + overrides/compose.redis.yaml.
+# Always run as:  docker compose -p education ...   from /docker/education
+#
+# Differences from upstream, all to fit next to Jitsi, WorkAdventure, n8n and Jim's apps:
+#   - no ports published; only the frontend joins n8n_default, and the shared Traefik routes
+#     SITE_NAME to it (router names start with "edu-")
+#   - db and redis stay on the private "edu" network
+#   - one background worker for all queues instead of two
+#   - memory/CPU caps on every service so Education cannot starve the other stacks
+#   - site creation is a one-off "create-site" service under the "setup" profile
+
+x-image: &image
+  image: ghcr.io/crimsoin/pcc-education:${EDU_TAG}
+  pull_policy: missing
+  platform: linux/amd64
+
+x-backend: &backend
+  <<: *image
+  restart: unless-stopped
+  networks: [edu]
+  volumes:
+    - sites:/home/frappe/frappe-bench/sites
+    - logs:/home/frappe/frappe-bench/logs
+  depends_on:
+    configurator:
+      condition: service_completed_successfully
+
+services:
+  configurator:
+    <<: *image
+    restart: on-failure
+    networks: [edu]
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+    entrypoint: [bash, -c]
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host db;
+        bench set-config -gp db_port 3306;
+        bench set-config -g redis_cache "redis://redis-cache:6379";
+        bench set-config -g redis_queue "redis://redis-queue:6379";
+        bench set-config -g redis_socketio "redis://redis-queue:6379";
+        bench set-config -gp socketio_port 9000;
+        bench set-config -g chromium_path /usr/bin/chromium-headless-shell;
+    depends_on:
+      db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+      redis-queue:
+        condition: service_started
+    mem_limit: 256m
+    cpus: 0.5
+
+  backend:
+    <<: *backend
+    environment:
+      GUNICORN_WORKERS: "2"
+      GUNICORN_THREADS: "4"
+      GUNICORN_TIMEOUT: "120"
+    mem_limit: 768m
+    cpus: 1.0
+
+  frontend:
+    <<: *image
+    restart: unless-stopped
+    command: [nginx-entrypoint.sh]
+    networks: [edu, n8n_default]
+    environment:
+      BACKEND: backend:8000
+      SOCKETIO: websocket:9000
+      NGINX_LISTEN_PORT: "8080"
+      FRAPPE_SITE_NAME_HEADER: ${SITE_NAME}
+      # Traefik reaches the frontend from the n8n_default network
+      UPSTREAM_REAL_IP_ADDRESS: ${TRAEFIK_SUBNET}
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: "120"
+      CLIENT_MAX_BODY_SIZE: 50m
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+    depends_on: [backend, websocket]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: n8n_default
+      traefik.http.routers.edu-portal.rule: "Host(`${SITE_NAME}`)"
+      traefik.http.routers.edu-portal.entrypoints: websecure
+      traefik.http.routers.edu-portal.tls: "true"
+      traefik.http.routers.edu-portal.tls.certresolver: mytlschallenge
+      traefik.http.routers.edu-portal.service: edu-portal
+      traefik.http.services.edu-portal.loadbalancer.server.port: "8080"
+    mem_limit: 128m
+    cpus: 0.5
+
+  websocket:
+    <<: *backend
+    command: [node, /home/frappe/frappe-bench/apps/frappe/socketio.js]
+    mem_limit: 192m
+    cpus: 0.25
+
+  queue:
+    <<: *backend
+    command: bench worker --queue long,default,short
+    mem_limit: 512m
+    cpus: 0.75
+
+  scheduler:
+    <<: *backend
+    command: bench schedule
+    mem_limit: 256m
+    cpus: 0.25
+
+  db:
+    image: mariadb:11.8
+    restart: unless-stopped
+    networks: [edu]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 5s
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --skip-character-set-client-handshake
+      - --innodb-buffer-pool-size=256M
+      - --performance-schema=OFF
+      - --max-connections=100
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MARIADB_AUTO_UPGRADE: "1"
+    volumes:
+      - db-data:/var/lib/mysql
+    mem_limit: 640m
+    cpus: 1.0
+
+  redis-cache:
+    image: redis:8.6-alpine
+    restart: unless-stopped
+    networks: [edu]
+    command: [redis-server, --maxmemory, 128mb, --maxmemory-policy, allkeys-lru, --save, ""]
+    mem_limit: 192m
+    cpus: 0.25
+
+  redis-queue:
+    image: redis:8.6-alpine
+    restart: unless-stopped
+    networks: [edu]
+    volumes:
+      - redis-queue-data:/data
+    mem_limit: 128m
+    cpus: 0.25
+
+  # One-off: creates the site and installs the apps. Never runs on "up".
+  #   docker compose -p education --profile setup run --rm create-site
+  create-site:
+    <<: *image
+    profiles: [setup]
+    networks: [edu]
+    volumes:
+      - sites:/home/frappe/frappe-bench/sites
+      - logs:/home/frappe/frappe-bench/logs
+    entrypoint: [bash, -c]
+    command:
+      - >
+        bench new-site "$$SITE_NAME"
+        --mariadb-user-host-login-scope='%'
+        --db-root-password "$$DB_PASSWORD"
+        --admin-password "$$ADMIN_PASSWORD"
+        --install-app erpnext
+        --install-app hrms
+        --install-app education
+        --set-default
+    environment:
+      SITE_NAME: ${SITE_NAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    mem_limit: 1536m
+    cpus: 1.0
+
+networks:
+  edu:
+  n8n_default:
+    external: true
+
+volumes:
+  sites:
+  logs:
+  db-data:
+  redis-queue-data:
