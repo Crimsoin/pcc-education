@@ -6,7 +6,7 @@ Hostinger VPS `srv1586246.hstgr.cloud` (187.127.110.227).
 - **Site:** https://portal.srv1586246.hstgr.cloud
 - **Desk (staff):** https://portal.srv1586246.hstgr.cloud/app/education
 - **Student/guardian portal:** https://portal.srv1586246.hstgr.cloud/edu-portal
-- **Admissions page:** https://portal.srv1586246.hstgr.cloud/admissions
+- **Admissions page:** https://portal.srv1586246.hstgr.cloud/admissions (currently broken upstream, see [Known issues](#known-issues))
 - **Deployed:** 28 Sep 2026 (image `16-build1`: Frappe 16.35.0, ERPNext 16.36.0, HRMS 16.20.0, Education 16.0.1)
 
 ## Rules for the shared VPS
@@ -60,6 +60,37 @@ Total cap for the running services is about 2.75 GB; at idle they use about 0.7 
   (database), `education_redis-queue-data`, `education_logs`.
 - **Secrets:** `DB_PASSWORD` (MariaDB root) and `ADMIN_PASSWORD` (the site's `Administrator`)
   exist only in `/docker/education/.env` on the server (mode 600). Never commit them.
+
+## Branding
+
+PCC branding is stored in the site's settings (database), not in files or the image, so it
+survives image updates. Logo source: `Desktop\Class\branding\logo.png` (same as Jitsi's), copied to
+[branding/](branding/).
+
+| Where | Setting | Value |
+|---|---|---|
+| Login page logo, desk | Website Settings → App Logo; Navbar Settings → Application Logo | `/files/pcc-logo.png` |
+| Browser tab icon | Website Settings → Favicon | `/files/pcc-favicon.png` (96×96) |
+| App name | Website Settings and System Settings → App Name | `PCC Portal` |
+| Loading screen | Website Settings → Splash Image | `/files/pcc-logo.png` |
+| Public website header | Website Settings → Brand HTML | logo + "Philippine Coding Camp" |
+| Student portal (`/edu-portal`) | Education Settings → School/College Logo, Abbreviation | logo, `PCC` |
+| Printed documents | Company "Philippine Coding Camp" → Company Logo (used by the default letter head) | logo |
+
+- **Change it:** edit those fields in the desk, or change [branding/apply_branding.py](branding/apply_branding.py)
+  and re-run it. It's safe to re-run: copy `branding/` to the server, then
+  `docker compose -p education cp <dir> backend:/tmp/pcc-branding` and
+  `docker compose -p education exec -T -w /home/frappe/frappe-bench/sites backend ../env/bin/python /tmp/pcc-branding/apply_branding.py`.
+- **Undo:** the previous values are in [branding/settings-before.json](branding/settings-before.json)
+  (all empty, apart from the app names "Frappe" and "ERPNext").
+- The logo is 200×200, which is enough for the screen. For sharper prints, upload a larger PNG or SVG
+  as the Company Logo.
+
+## Known issues
+
+- **`/admissions` returns a 500 error.** It's an upstream Education v16 bug (missing list template),
+  [frappe/education#440](https://github.com/frappe/education/issues/440), and unrelated to our setup.
+  Applicants can still be entered in the desk under Student Applicant.
 
 ## Everyday commands (on the VPS, in `/docker/education`)
 

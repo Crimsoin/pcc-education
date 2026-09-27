@@ -1,0 +1,9 @@
+{
+  "_note": "Branding values on portal.srv1586246.hstgr.cloud before PCC branding (28 Sep 2026). Empty = not set.",
+  "Website Settings": {"app_name": "Frappe", "app_logo": "", "favicon": "", "splash_image": "", "brand_html": ""},
+  "Navbar Settings": {"app_logo": ""},
+  "System Settings": {"app_name": "ERPNext"},
+  "Education Settings": {"school_college_name_abbreviation": "", "school_college_logo": ""},
+  "Company:Philippine Coding Camp": {"company_logo": null},
+  "Letter Head": {"default": "Company Letterhead - Grey"}
+}
