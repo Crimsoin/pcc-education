@@ -61,32 +61,6 @@ Total cap for the running services is about 2.75 GB; at idle they use about 0.7 
 - **Secrets:** `DB_PASSWORD` (MariaDB root) and `ADMIN_PASSWORD` (the site's `Administrator`)
   exist only in `/docker/education/.env` on the server (mode 600). Never commit them.
 
-## Branding
-
-PCC branding is stored in the site's settings (database), not in files or the image, so it
-survives image updates. Logo source: `Desktop\Class\branding\logo.png` (same as Jitsi's), copied to
-[branding/](branding/).
-
-| Where | Setting | Value |
-|---|---|---|
-| Login page logo, desk | Website Settings → App Logo; Navbar Settings → Application Logo | `/files/pcc-logo.png` |
-| Browser tab icon | Website Settings → Favicon | `/files/pcc-favicon.png` (96×96) |
-| App name | Website Settings and System Settings → App Name | `PCC Portal` |
-| Loading screen | Website Settings → Splash Image | `/files/pcc-logo.png` |
-| Public website header | Website Settings → Brand HTML | logo + "Philippine Coding Camp" |
-| Student portal (`/edu-portal`) | Education Settings → School/College Logo, Abbreviation | logo, `PCC` |
-| Printed documents | Company "Philippine Coding Camp" → Company Logo (used by the default letter head) | logo |
-| Login page layout (logo and heading centered, card centered vertically) | Website Settings → Head HTML | [branding/login-center.css](branding/login-center.css) in a `<style id="pcc-login">` tag; every rule is scoped to `body[data-path="login"]`, so other pages are unaffected |
-
-- **Change it:** edit those fields in the desk, or change [branding/apply_branding.py](branding/apply_branding.py)
-  and re-run it. It's safe to re-run: copy `branding/` to the server, then
-  `docker compose -p education cp <dir> backend:/tmp/pcc-branding` and
-  `docker compose -p education exec -T -w /home/frappe/frappe-bench/sites backend ../env/bin/python /tmp/pcc-branding/apply_branding.py`.
-- **Undo:** the previous values are in [branding/settings-before.json](branding/settings-before.json)
-  (all empty, apart from the app names "Frappe" and "ERPNext").
-- The logo is 200×200, which is enough for the screen. For sharper prints, upload a larger PNG or SVG
-  as the Company Logo.
-
 ## Known issues
 
 - **`/admissions` returns a 500 error.** It's an upstream Education v16 bug (missing list template),
