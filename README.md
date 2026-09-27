@@ -61,6 +61,17 @@ Total cap for the running services is about 2.75 GB; at idle they use about 0.7 
 - **Secrets:** `DB_PASSWORD` (MariaDB root) and `ADMIN_PASSWORD` (the site's `Administrator`)
   exist only in `/docker/education/.env` on the server (mode 600). Never commit them.
 
+## Customization
+
+Branding is the Frappe default (no custom logo or app name). The only customization is the login
+page layout: the icon and heading are centered, and the card is centered vertically.
+
+- Stored in **Website Settings → Head HTML** as a `<style id="login-center">` tag with
+  [customization/login-center.css](customization/login-center.css). It's in the site's database, so it
+  survives image updates.
+- Every rule is scoped to `body[data-path="login"]`, so other pages are unaffected.
+- **Undo:** clear the Head HTML field (it was empty before).
+
 ## Known issues
 
 - **`/admissions` returns a 500 error.** It's an upstream Education v16 bug (missing list template),
