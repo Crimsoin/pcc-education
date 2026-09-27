@@ -1,0 +1,6 @@
+# Secrets are generated on the server and never stored here
+.env
+*.env
+!deploy/env.template
+*.bak*
+frappe_docker/
