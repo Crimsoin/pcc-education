@@ -1,0 +1,21 @@
+/* PCC: center the login page (logo + heading, and the whole card vertically). Login page only. */
+body[data-path="login"] .page-breadcrumbs,
+body[data-path="login"] .page-header-wrapper { display: none; }
+body[data-path="login"] .page-content-wrapper {
+	min-height: 100vh;
+	min-height: 100svh;
+	padding-top: 0;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+}
+body[data-path="login"] .page-card-head {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+}
+body[data-path="login"] .page-card-head .app-logo { margin-left: auto; margin-right: auto; }
+@media (max-width: 575.98px) {
+	body[data-path="login"] .page-card { justify-content: center; padding-top: 32px; }
+}

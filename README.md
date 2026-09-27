@@ -76,6 +76,7 @@ survives image updates. Logo source: `Desktop\Class\branding\logo.png` (same as 
 | Public website header | Website Settings → Brand HTML | logo + "Philippine Coding Camp" |
 | Student portal (`/edu-portal`) | Education Settings → School/College Logo, Abbreviation | logo, `PCC` |
 | Printed documents | Company "Philippine Coding Camp" → Company Logo (used by the default letter head) | logo |
+| Login page layout (logo and heading centered, card centered vertically) | Website Settings → Head HTML | [branding/login-center.css](branding/login-center.css) in a `<style id="pcc-login">` tag; every rule is scoped to `body[data-path="login"]`, so other pages are unaffected |
 
 - **Change it:** edit those fields in the desk, or change [branding/apply_branding.py](branding/apply_branding.py)
   and re-run it. It's safe to re-run: copy `branding/` to the server, then
