@@ -1,13 +1,16 @@
 # PCC Education (Frappe Education on the VPS)
 
-Frappe v16 + ERPNext + HRMS + Education for Philippine Coding Camp, running on the
+Frappe v16 + ERPNext + HRMS + Education + LMS for Philippine Coding Camp, running on the
 Hostinger VPS `srv1586246.hstgr.cloud` (187.127.110.227).
 
 - **Site:** https://portal.srv1586246.hstgr.cloud
-- **Desk (staff):** https://portal.srv1586246.hstgr.cloud/app/education
+- **Desk (staff):** https://portal.srv1586246.hstgr.cloud/desk (old `/app` links redirect there)
+- **LMS (online courses):** https://portal.srv1586246.hstgr.cloud/lms
 - **Student/guardian portal:** https://portal.srv1586246.hstgr.cloud/edu-portal
 - **Admissions page:** https://portal.srv1586246.hstgr.cloud/admissions (currently broken upstream, see [Known issues](#known-issues))
 - **Deployed:** 28 Sep 2026 (image `16-build1`: Frappe 16.35.0, ERPNext 16.36.0, HRMS 16.20.0, Education 16.0.1)
+- **LMS added:** 28 Sep 2026 (image `16-build2`: same apps plus Payments 0.0.1 and LMS 2.63.0, installed on the
+  same site, so Education and LMS share users and logins)
 
 ## Rules for the shared VPS
 
@@ -27,7 +30,7 @@ The server never builds anything. GitHub Actions builds the image and the VPS pu
 
 | File | Purpose |
 |---|---|
-| [apps.json](apps.json) | Apps baked into the image (ERPNext, HRMS, Education, all `version-16`) |
+| [apps.json](apps.json) | Apps baked into the image (ERPNext, HRMS, Education, Payments, LMS, all `version-16`) |
 | [.github/workflows/build-image.yml](.github/workflows/build-image.yml) | Builds with frappe_docker's `images/layered/Containerfile`, pushes `ghcr.io/crimsoin/pcc-education:16` and `:16-buildN` (public) |
 | [deploy/docker-compose.yaml](deploy/docker-compose.yaml) | The `education` project on the VPS |
 | [deploy/env.template](deploy/env.template) | Settings; `install.sh` turns it into `.env` with generated passwords |

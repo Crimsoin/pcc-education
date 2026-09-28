@@ -1,4 +1,4 @@
-# Frappe Education (Frappe v16 + ERPNext + HRMS + Education) on the shared VPS.
+# Frappe Education (Frappe v16 + ERPNext + HRMS + Education + Payments + LMS) on the shared VPS.
 # Based on frappe_docker's compose.yaml + overrides/compose.mariadb.yaml + overrides/compose.redis.yaml.
 # Always run as:  docker compose -p education ...   from /docker/education
 #
@@ -173,6 +173,8 @@ services:
         --install-app erpnext
         --install-app hrms
         --install-app education
+        --install-app payments
+        --install-app lms
         --set-default
     environment:
       SITE_NAME: ${SITE_NAME}
