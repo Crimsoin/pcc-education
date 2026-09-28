@@ -145,9 +145,21 @@ docker compose -p education down        # stop and remove containers, keep data
 docker compose -p education down -v     # also delete the database and files (irreversible)
 ```
 
+## Outgoing email
+
+Set up 28 Sep 2026 in the desk as Email Account **PCC Portal** (`pccwebnotifs@gmail.com`),
+Service GMail, `smtp.gmail.com:587` with TLS, outgoing only, **Default Outgoing** on. It
+authenticates with a Gmail App Password stored only in the site (not in this repo). This makes
+"Forgot password?", welcome emails and notifications work.
+
+- Queued and failed emails: `/desk/email-queue`.
+- Gmail allows about 500 emails a day; use a sending service (e.g. Brevo) for bulk mail.
+- If the Gmail password changes or 2-Step Verification is turned off, the App Password stops
+  working: create a new one and paste it into the Email Account.
+
 ## Open items
 
-- Finish the setup wizard (company, academic year, programs) and change the Administrator password.
+- Configure the school (academic year, programs) and change the Administrator password.
 - Automate daily backups and copy them off the server.
 - Optional: a `philippinecoding.com` address (DNS **A record** → 187.127.110.227, not
   Websites → Subdomains), then `bench setup add-domain` / rename the site.
