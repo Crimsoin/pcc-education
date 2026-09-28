@@ -75,4 +75,4 @@ jobs:
       - name: Show installed app versions
         run: |
           docker run --rm --entrypoint bash ${{ env.IMAGE }}:16-build${{ github.run_number }} \
-            -c 'cd /home/frappe/frappe-bench && env/bin/python -c "import frappe, erpnext, hrms, education; [print(m.__name__, m.__version__) for m in (frappe, erpnext, hrms, education)]"'
+            -c 'cd /home/frappe/frappe-bench && env/bin/python -c "import frappe, erpnext, hrms, education, payments, lms; [print(m.__name__, getattr(m, \"__version__\", \"?\")) for m in (frappe, erpnext, hrms, education, payments, lms)]"'

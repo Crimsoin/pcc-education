@@ -10,5 +10,13 @@
   {
     "url": "https://github.com/frappe/education",
     "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/frappe/payments",
+    "branch": "version-16"
+  },
+  {
+    "url": "https://github.com/frappe/lms",
+    "branch": "version-16"
   }
 ]
