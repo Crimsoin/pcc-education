@@ -14,15 +14,29 @@ Hostinger VPS `srv1586246.hstgr.cloud` (187.127.110.227).
 
 ## Rules for the shared VPS
 
-The VPS also runs Jitsi (`/docker/jitsi`), WorkAdventure (`/docker/workadventure`), n8n + Traefik
-(`/docker/n8n`) and Sir Jim's apps.
+The VPS is shared. Education owns only the `education-*` containers, the `education_*` volumes
+and `/docker/education`. **Everything else on the server is off-limits.**
 
 - Everything for Education runs as `docker compose -p education` from `/docker/education`.
-- **Never touch Sir Jim's project:** `/home/jim`, the `jim` and `openvpn-ce` projects, the
-  `psmbfi_kc`, `psmbfi_kc_db`, `nginx-proxy`, `nginx-demo`, `certbot_ssl`, `dnsmasq` containers, UDP 1194.
-- Never restart or edit Jitsi, WorkAdventure, n8n or Traefik. No `down -v`, no `prune`, no
-  deploys through hPanel's Docker Manager, no Docker/server restarts.
+- **Never touch Sir Jim's project:** `/home/jim` and every container started from it (compose
+  project `jim`, and anything whose working directory is under `/home/jim`). Its containers
+  change over time, so check by working directory, not by name.
+- Never stop, restart, edit or remove another project's containers, networks or folders. No
+  `down -v`, no `prune`, no deploys through hPanel's Docker Manager, no Docker/server restarts.
 - Before a change, save the other containers' state; after it, compare (see [Health check](#health-check)).
+
+Other projects on the server (checked 18 Oct 2026), none of them part of Education:
+
+| Compose project | Folder | Note |
+|---|---|---|
+| `n8n` | `/docker/n8n` | n8n, plus the **Traefik** that routes Education's HTTPS. Never restart it. |
+| `jitsi` | `/docker/jitsi` | Video classes |
+| `workadventure` | `/docker/workadventure` | Virtual campus |
+| `virtual-campus` | `/docker/virtual-campus` | Added in October 2026 |
+| `webcompiler` | `/docker/webcompiler` | |
+| `jim`, `docker` (inscore-*) | `/home/jim/...` | **Sir Jim's.** Most were stopped by their owner in October 2026; leave them as they are. |
+
+To see who owns a container: `docker inspect <name> --format '{{index .Config.Labels "com.docker.compose.project.working_dir"}}'`.
 
 ## How it's built
 
@@ -63,6 +77,8 @@ Total cap for the running services is about 2.75 GB; at idle they use about 0.7 
   (database), `education_redis-queue-data`, `education_logs`.
 - **Secrets:** `DB_PASSWORD` (MariaDB root) and `ADMIN_PASSWORD` (the site's `Administrator`)
   exist only in `/docker/education/.env` on the server (mode 600). Never commit them.
+- **Reboots:** every service has `restart: unless-stopped`, so Education comes back on its own
+  after a server reboot (confirmed after the reboot on 17 Oct 2026).
 
 ## Customization
 
@@ -106,14 +122,39 @@ app on it, including Sir Jim's, so it's a last resort.
 ## Updating
 
 1. Change `apps.json` if needed and push, or run the workflow by hand. Note the new `16-buildN`.
-2. Take a backup (above).
-3. On the VPS: set `EDU_TAG=16-buildN` in `.env`, then:
+2. Check that no class is running on Jitsi. Take a **Hostinger snapshot** (hPanel → VPS →
+   Snapshots & Backups → New snapshot; it replaces the previous one and expires after about a day)
+   and a site backup (above). Taking a snapshot doesn't stop anything; **never use Restore**,
+   because it rolls back every project on the server, including Sir Jim's.
+3. On the VPS: save the [health check](#health-check) baseline, keep the current settings
+   (`cp .env .env.bak-buildN`), set `EDU_TAG=16-buildN` in `.env`, then:
    ```bash
    docker compose -p education pull
-   docker compose -p education up -d
-   docker compose -p education exec backend bench --site portal.srv1586246.hstgr.cloud migrate
+   docker compose -p education up -d      # recreates only the education-* app containers
+   docker compose -p education --profile setup run --rm create-site \
+     "bench --site portal.srv1586246.hstgr.cloud migrate && bench --site portal.srv1586246.hstgr.cloud clear-cache"
    ```
+   Run heavy bench commands (`migrate`, `install-app`) through the one-off `create-site`
+   container like this. It has its own 1.5 GB / 1 CPU cap, so the live backend (768 MB) isn't starved.
 4. Run the health check.
+
+### Adding another Frappe app
+
+This is how LMS was added on 28 Sep 2026 (image `16-build2`):
+
+1. Add the app to `apps.json` on its `version-16` branch, together with any app it requires (its
+   `hooks.py` lists them as `required_apps`; LMS needs `payments`). Add it to the version check
+   at the end of the workflow too. Pushing builds the new `16-buildN`.
+2. Update the server as above (steps 2–3), and before the migrate command install the app:
+   ```bash
+   docker compose -p education --profile setup run --rm create-site \
+     "bench --site portal.srv1586246.hstgr.cloud install-app <app>"
+   ```
+3. Add `--install-app <app>` to the `create-site` service in
+   [deploy/docker-compose.yaml](deploy/docker-compose.yaml), so a fresh redeploy includes it, and
+   copy the file to `/docker/education` on the server.
+4. Existing users don't get the new app's roles automatically. Give them to the admins again (see
+   [Users and roles](#users-and-roles)).
 
 ## Health check
 
@@ -126,7 +167,9 @@ diff /root/containers-before.txt /root/containers-after.txt && echo "others unch
 curl -s -o /dev/null -w '%{http_code}\n' https://portal.srv1586246.hstgr.cloud/api/method/ping
 ```
 
-The deployment baseline is `/root/containers-before-education.txt` (22 containers, 28 Sep).
+Always take a fresh baseline right before a change, because the other projects on the server change
+over time. Earlier baselines are kept as `/root/containers-*.txt` (Education install and LMS
+install, both 28 Sep 2026).
 
 ## Redeploy from scratch / new server
 
@@ -159,6 +202,61 @@ authenticates with a Gmail App Password stored only in the site (not in this rep
 - Gmail allows about 500 emails a day; use a sending service (e.g. Brevo) for bulk mail.
 - If the Gmail password changes or 2-Step Verification is turned off, the App Password stops
   working: create a new one and paste it into the Email Account.
+
+## Users and roles
+
+- **System Manager** is the admin role: users, roles, settings. Each app's records also need that
+  app's own roles. For a full admin, open the user → **Roles & Permissions** → **Select All**,
+  then **untick Student and Guardian**.
+- **Student and Guardian send people to the student portal** (`/edu-portal`) after login instead
+  of the desk. Never give them to staff or admins.
+- **New apps add roles that existing users don't get.** After installing an app, repeat Select All
+  for admins. For example, the LMS desk icon ("Frappe Learning") only shows for users with an LMS role.
+- **Only System Managers can change roles.** To stop a staff account from managing roles, leave
+  System Manager off it; Education Manager is enough to run the school.
+- **The built-in `Administrator`** bypasses all permission checks. Keep it for emergencies, with a
+  strong password.
+- **New users:** leave "Send Welcome Email" ticked so they choose their own password. Students get
+  a login automatically when their Student record has an email address.
+
+| Who | Roles |
+|---|---|
+| Full admin | Select All, minus Student and Guardian |
+| School office | Education Manager, Academics User |
+| Teacher | Instructor, Academics User (plus Course Creator to write LMS courses) |
+| LMS admin | Moderator |
+| LMS course author / grader | Course Creator / Batch Evaluator |
+
+**Education and LMS are separate apps on one site.** They share logins, users, email and backups,
+but not records. Education's Students, Programs/Courses, Student Groups, Instructors, grades and
+fees aren't linked to LMS's courses, batches, instructors, scores or payments. A teacher who works in
+both needs an Education **Instructor** record (linked to an Employee) and, in LMS, the
+**Course Creator** role plus a place on the course. Linking the two would need a small custom app
+(or Server Scripts / n8n); nothing like that exists yet.
+
+## Handover
+
+This repo is the recipe, not the whole system. A new owner also needs:
+
+| What | Where it is now | How to hand it over |
+|---|---|---|
+| This repo | GitHub, account `Crimsoin` | Settings → Transfer ownership, or add them as a collaborator |
+| The built image | `ghcr.io/crimsoin/pcc-education` (account `Crimsoin`) | **Doesn't move with the repo.** Change `IMAGE` in the workflow and `image:` in `deploy/docker-compose.yaml` to the new owner's name, rebuild, and copy the compose file to the server. Keep the old image until the server uses the new one. |
+| The server | Hostinger VPS `srv1586246` (root SSH) | See the warning below |
+| Database and initial `Administrator` passwords | `/docker/education/.env` on the server only | Comes with server access |
+| The site's data: users, students, courses, settings, files | The server only (`education_*` volumes) | Comes with the server, or move it with a site backup (see [Backups](#backups)) |
+| A site admin login | The site | Create them their own System Manager account; don't share accounts |
+| Sending email | Google account `pccwebnotifs@gmail.com` (App Password) | Hand over the Google account, or set up a new one and replace the password in the Email Account |
+| Address | `portal.srv1586246.hstgr.cloud`, Hostinger's default name | Nothing to transfer while it stays on this server |
+
+**The server is shared.** Anyone who can run Docker on it controls every project there, not
+just Education, including Sir Jim's; Education-only access isn't possible. Either the new owner is
+trusted with the whole server (agree it with the server's owner and Sir Jim), or move Education to its
+own server first: take a site backup with files, follow
+[Redeploy from scratch](#redeploy-from-scratch--new-server), and restore the backup there.
+
+The setup was done with Claude Code. Its notes and conversations stay on the original owner's
+PC, so everything a new owner needs belongs in this README.
 
 ## Open items
 
